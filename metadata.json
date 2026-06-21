@@ -1,0 +1,6 @@
+{
+  "name": "Detetive de Golpes",
+  "description": "Identifique sites falsos, phishing e golpes de Pix em segundos com análises de inteligência artificial e antivírus integrado.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
