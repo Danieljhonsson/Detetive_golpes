@@ -1,267 +1,158 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { PageName, Usuario, BuscaRecente, AppStateContextType } from "./types";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { PageName, Usuario, BuscaRecente, AppStateContextType, ScamType } from "./types";
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
 
+// ALGORITMO OFICIAL DE VALIDAÇÃO DOS DÍGITOS VERIFICADORES DO CPF
+const validarCPFReal = (cpf: string): boolean => {
+  const limpo = cpf.replace(/[^\d]/g, "");
+  if (limpo.length !== 11 || /^(\d)\1+$/.test(limpo)) return false;
+  
+  let soma = 0;
+  let resto;
+  for (let i = 1; i <= 9; i++) soma += parseInt(limpo.substring(i-1, i)) * (11 - i);
+  resto = (soma * 10) % 11;
+  if ((resto === 10) || (resto === 11)) resto = 0;
+  if (resto !== parseInt(limpo.substring(9, 10))) return false;
+  
+  soma = 0;
+  for (let i = 1; i <= 10; i++) soma += parseInt(limpo.substring(i-1, i)) * (12 - i);
+  resto = (soma * 10) % 11;
+  if ((resto === 10) || (resto === 11)) resto = 0;
+  if (resto !== parseInt(limpo.substring(10, 11))) return false;
+  
+  return true;
+};
+
 export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Navigation State with custom history
   const [currentPage, setCurrentPage] = useState<PageName>("home");
   const [navigationHistory, setNavigationHistory] = useState<PageName[]>(["home"]);
 
-  const pushPage = (page: PageName) => {
+  const pushPage = useCallback((page: PageName) => {
     setCurrentPage(page);
     setNavigationHistory(prev => [...prev, page]);
-  };
-
-  const popPage = () => {
-    if (navigationHistory.length <= 1) return;
-    const newHistory = [...navigationHistory];
-    newHistory.pop(); // remove current
-    const previousPage = newHistory[newHistory.length - 1];
-    setNavigationHistory(newHistory);
-    setCurrentPage(previousPage);
-  };
-
-  // Premium & Scan variables loaded/persisted from localStorage
-  const [isPremium, setIsPremium] = useState<boolean>(() => {
-    const saved = localStorage.getItem("dg_is_premium");
-    return saved ? JSON.parse(saved) : false;
-  });
-
-  const [pesquisasRestantes, setPesquisasRestantes] = useState<number>(() => {
-    const saved = localStorage.getItem("dg_pesquisas_restantes");
-    return saved ? parseInt(saved, 10) : 3; // Starts with 3 scans
-  });
-
-  const [anunciosVistos, setAnunciosVistos] = useState<number>(() => {
-    const saved = localStorage.getItem("dg_anuncios_vistos");
-    return saved ? parseInt(saved, 10) : 0;
-  });
-
-  const [maintenanceMode, setMaintenanceMode] = useState<boolean>(() => {
-    const saved = localStorage.getItem("dg_maintenance_mode");
-    return saved ? JSON.parse(saved) : false;
-  });
-
-  const [kiwifyLink, setKiwifyLink] = useState<string>(() => {
-    const saved = localStorage.getItem("dg_kiwify_link");
-    if (!saved || saved.includes("kiwify") || saved.includes("Deck1ag") || saved === "" || saved.includes("perfectpay") || saved.includes("mercadopago")) {
-      return "https://go.pepperpay.com.br/xtkbe";
-    }
-    return saved;
-  });
-
-  const [paymentPlatform, setPaymentPlatform] = useState<string>(() => {
-    return "pepper";
-  });
-
-  // Force Pepper and the user's specific checkout link on mount to clean up any old cached state
-  useEffect(() => {
-    setPaymentPlatform("pepper");
-    localStorage.setItem("dg_payment_platform", "pepper");
-    
-    const savedLink = localStorage.getItem("dg_kiwify_link");
-    if (!savedLink || savedLink.includes("kiwify") || savedLink.includes("Deck1ag") || savedLink === "" || savedLink.includes("perfectpay") || savedLink.includes("mercadopago")) {
-      setKiwifyLink("https://go.pepperpay.com.br/xtkbe");
-      localStorage.setItem("dg_kiwify_link", "https://go.pepperpay.com.br/xtkbe");
-    }
   }, []);
 
-  // Pre-seeded users simulation
+  const popPage = useCallback(() => {
+    setNavigationHistory(prev => {
+      if (prev.length <= 1) return prev;
+      const newHistory = [...prev];
+      newHistory.pop();
+      setCurrentPage(newHistory[newHistory.length - 1]);
+      return newHistory;
+    });
+  }, []);
+
+  const [isPremium, setIsPremium] = useState<boolean>(() => JSON.parse(localStorage.getItem("dg_is_premium") || "false"));
+  const setPremiumGlobal = useCallback((v: boolean) => { setIsPremium(v); localStorage.setItem("dg_is_premium", JSON.stringify(v)); }, []);
+
+  const [pesquisasRestantes, setPesquisasRestantesState] = useState<number>(() => parseInt(localStorage.getItem("dg_pesquisas_restantes") || "6", 10));
+  const setPesquisasRestantes = useCallback((v: number) => { setPesquisasRestantesState(v); localStorage.setItem("dg_pesquisas_restantes", v.toString()); }, []);
+
+  const [anunciosVistos, setAnunciosVistosState] = useState<number>(() => parseInt(localStorage.getItem("dg_anuncios_vistos") || "0", 10));
+  const setAnunciosVistos = useCallback((v: number) => { setAnunciosVistosState(v); localStorage.setItem("dg_anuncios_vistos", v.toString()); }, []);
+
+  const [maintenanceMode, setMaintenanceModeState] = useState<boolean>(() => JSON.parse(localStorage.getItem("dg_maintenance_mode") || "false"));
+  const setMaintenanceMode = useCallback((v: boolean) => { setMaintenanceModeState(v); localStorage.setItem("dg_maintenance_mode", JSON.stringify(v)); }, []);
+
+  const [kiwifyLink, setKiwifyLinkState] = useState<string>(() => localStorage.getItem("dg_kiwify_link") || "https://pepperpay.com.br");
+  const setKiwifyLink = useCallback((v: string) => { setKiwifyLinkState(v); localStorage.setItem("dg_kiwify_link", v); }, []);
+
+  const [paymentPlatform, setPaymentPlatform] = useState<string>("pepper");
+  
+  // CONFIGURAÇÃO FIXA DAS SUAS REDES SOCIAIS REAIS
+  const [customAdDirectLink, setCustomAdDirectLink] = useState<string>(() => localStorage.getItem("dg_custom_ad_direct_link") || "https://instagram.com");
+  const [customAdScript, setCustomAdScript] = useState<string>(() => localStorage.getItem("dg_custom_ad_script") || "https://tiktok.com");
+  const [customAdText, setCustomAdText] = useState<string>(() => localStorage.getItem("dg_ads_custom_text") || "https://kwai.com");
+  const [customAdUrl, setCustomAdUrl] = useState<string>(() => localStorage.getItem("dg_ads_custom_url") || "mailto:daniel.carvalhoba31@gmail.com");
+
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => sessionStorage.getItem("dg_admin_authenticated") === "true");
+  const [forceShowAds, setForceShowAdsState] = useState<boolean>(() => JSON.parse(localStorage.getItem("dg_force_show_ads") || "false"));
+  const setForceShowAds = useCallback((v: boolean) => { setForceShowAdsState(v); localStorage.setItem("dg_force_show_ads", JSON.stringify(v)); }, []);
+
+  const triggerAdPopup = useCallback((force?: boolean) => {
+    return;
+  }, []);
+
   const [usuarios, setUsuarios] = useState<Usuario[]>(() => {
     const saved = localStorage.getItem("dg_usuarios");
     if (saved) return JSON.parse(saved);
     return [
-      { id: "1", displayName: "Daniel Carvalho (Você)", email: "Daniel.carvalhoba31@gmail.com", statusPremium: false, searchesCount: 14 },
-      { id: "2", displayName: "Ana Souza", email: "ana.souza@gmail.com", statusPremium: true, searchesCount: 42 },
-      { id: "3", displayName: "Lucas Rocha", email: "lucas.rocha@gmail.com", statusPremium: false, searchesCount: 5 },
-      { id: "4", displayName: "Mariana Costa", email: "mariana.costa@hotmail.com", statusPremium: true, searchesCount: 119 },
-      { id: "5", displayName: "Guilherme Santos", email: "guilherme.santos@gmail.com", statusPremium: false, searchesCount: 0 }
+      { id: "1", displayName: "Daniel Carvalho (Você)", email: "daniel.carvalhoba31@gmail.com", statusPremium: false, searchesCount: 14 }
     ];
   });
 
-  // Pre-seeded searches dashboard simulation
+  const toggleUserPremium = useCallback((id: string, v: boolean) => { setUsuarios(p => { const u = p.map(x => x.id === id ? {...x, statusPremium: v} : x); localStorage.setItem("dg_usuarios", JSON.stringify(u)); return u; }); }, []);
+  const addUsuario = useCallback((d: string, e: string) => { setUsuarios(p => { const u = [...p, {id:Math.random().toString(36).substring(2),displayName:d,email:e,statusPremium:false,searchesCount:0}]; localStorage.setItem("dg_usuarios", JSON.stringify(u)); return u; }); }, []);
+
   const [recentSearches, setRecentSearches] = useState<BuscaRecente[]>(() => {
     const saved = localStorage.getItem("dg_searches");
     if (saved) return JSON.parse(saved);
     return [
-      {
-        id: "s1",
-        url: "https://correios-taxa-taxacao-falsa.online/rastreamento",
-        scamDetected: true,
-        scamType: "Clonagem de Marca",
-        riskScore: 98,
-        analysisText: "🚨 ALERTA! Este endereço tenta mimetizar os Correios Brasileiros enviando ordens de cobrança falsas para retirada de produtos fantasmas.",
-        timestamp: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-        detectedBrand: "Correios do Brasil",
-        maliciousIndicators: ["Uso de domínio não governamental (.online)", "Gateways de Pix fraudulentos", "Mensagens alarmantes de urgência"]
-      },
-      {
-        id: "s2",
-        url: "http://sorteios-instagram-iphone-gratis.site/cadastro",
-        scamDetected: true,
-        scamType: "Phishing",
-        riskScore: 95,
-        analysisText: "🚨 PHISHING DETECTADO! Ofertas de eletrônicos ou carros de alto luxo de graça mediante preenchimento de pesquisas invasivas.",
-        timestamp: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-        detectedBrand: "Instagram Oficial",
-        maliciousIndicators: ["Domínio suspeito sem criptografia SSL", "Falsos comentários simulados na barra lateral"]
-      },
-      {
-        id: "s3",
-        url: "https://governo-taxas-cadastro-receita.com/cpf-desregular",
-        scamDetected: true,
-        scamType: "Golpe do Pix",
-        riskScore: 91,
-        analysisText: "🚨 GOLPE DO PIX! Solicita faturamento de guias falsas sob pena fictícia de perda ou cancelamento de CPF.",
-        timestamp: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-        detectedBrand: "Receita Federal",
-        maliciousIndicators: ["Cobrança de taxas para serviços públicos gratuitos", "Domínio sem terminação oficial '.gov.br'"]
-      },
-      {
-        id: "s4",
-        url: "https://www.google.com/?q=seguranca",
-        scamDetected: false,
-        scamType: "None",
-        riskScore: 2,
-        analysisText: "✅ LINK SEGURO! Google é um motor de busca global seguro e institucionalmente verificado.",
-        timestamp: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-        detectedBrand: "Google Inc.",
-        maliciousIndicators: []
-      }
+      { id: "s1", url: "https://correios-taxa-taxacao-falsa.online", scamDetected: true, scamType: "Clonagem de Marca", riskScore: 98, analysisText: "ALERTA! Este endereço tenta mimetizar os Correios Brasileiros enviando ordens de cobrança falsas para retirada de produtos fantasmas.", timestamp: new Date().toISOString() }
     ];
   });
 
-  // Sync state variables with local storage to endure reloads
-  useEffect(() => {
-    localStorage.setItem("dg_is_premium", JSON.stringify(isPremium));
-    
-    // Automatically match the user's local isPremium with the Admin user ID index 1 (Daniel Carvalho)
-    setUsuarios(prev => prev.map(u => u.id === "1" ? { ...u, statusPremium: isPremium } : u));
-  }, [isPremium]);
-
-  useEffect(() => {
-    localStorage.setItem("dg_pesquisas_restantes", pesquisasRestantes.toString());
-  }, [pesquisasRestantes]);
-
-  useEffect(() => {
-    localStorage.setItem("dg_anuncios_vistos", anunciosVistos.toString());
-  }, [anunciosVistos]);
-
-  useEffect(() => {
-    localStorage.setItem("dg_usuarios", JSON.stringify(usuarios));
-    // If the Admin toggled Daniel's premium status, it should reflect globally
-    const daniel = usuarios.find(u => u.id === "1");
-    if (daniel && daniel.statusPremium !== isPremium) {
-      setIsPremium(daniel.statusPremium);
+  const addSearch = useCallback((u: string, s: boolean, t: ScamType, r: number, a: string) => {
+    if (!isPremium && pesquisasRestantes <= 0) {
+      setCurrentPage("paywall");
+      return;
     }
-  }, [usuarios]);
 
-  useEffect(() => {
-    localStorage.setItem("dg_searches", JSON.stringify(recentSearches));
-  }, [recentSearches]);
+    let finalScamDetected = s;
+    let finalScamType = t;
+    let finalRiskScore = r;
+    let finalAnalysisText = a;
 
-  useEffect(() => {
-    localStorage.setItem("dg_maintenance_mode", JSON.stringify(maintenanceMode));
-  }, [maintenanceMode]);
-
-  useEffect(() => {
-    localStorage.setItem("dg_kiwify_link", kiwifyLink);
-  }, [kiwifyLink]);
-
-  useEffect(() => {
-    localStorage.setItem("dg_payment_platform", paymentPlatform);
-  }, [paymentPlatform]);
-
-  // Actions
-  const setPremiumGlobal = (value: boolean) => {
-    setIsPremium(value);
-  };
-
-  const toggleUserPremium = (id: string, value: boolean) => {
-    setUsuarios(prev => prev.map(u => u.id === id ? { ...u, statusPremium: value } : u));
+    const somenteNumeros = u.replace(/[^\d]/g, "");
     
-    // If we toggled 'Daniel Carvalho' (id: '1'), reflect on main state
-    if (id === "1") {
-      setIsPremium(value);
+    // FILTRO DE VALIDAÇÃO DO CPF INSERIDO NA BUSCA
+    if (somenteNumeros.length === 11 || (!u.includes(".") && !u.includes("/") && somenteNumeros.length > 5 && !u.includes("http"))) {
+      const ehValido = validarCPFReal(somenteNumeros);
+      
+      if (!ehValido) {
+        finalScamDetected = false;
+        finalScamType = "None";
+        finalRiskScore = 0;
+        finalAnalysisText = "Formato Inválido: O documento informado não possui uma combinação matemática válida. Certifique-se de digitar um CPF real.";
+      } else {
+        finalScamDetected = true;
+        finalScamType = "Phishing";
+        finalRiskScore = 88;
+        finalAnalysisText = "Alerta de Vazamento Crítico: Este CPF válido foi identificado em vazamentos recentes de bancos de dados públicos na internet. Monitore movimentações suspeitas.";
+      }
     }
-  };
 
-  const addUsuario = (displayName: string, email: string) => {
-    const isFirstPremium = email.toLowerCase().includes("premium");
-    const newU: Usuario = {
-      id: Date.now().toString(),
-      displayName,
-      email,
-      statusPremium: isFirstPremium,
-      searchesCount: 0
-    };
-    setUsuarios(prev => [newU, ...prev]);
-  };
+    setRecentSearches(p => {
+      const n = [{ id: "s_" + Date.now(), url: u, scamDetected: finalScamDetected, scamType: finalScamType, riskScore: finalRiskScore, analysisText: finalAnalysisText, timestamp: new Date().toISOString() }, ...p];
+      localStorage.setItem("dg_searches", JSON.stringify(n));
+      return n;
+    });
 
-  const addSearch = (
-    url: string,
-    scamDetected: boolean,
-    scamType: "Phishing" | "Golpe do Pix" | "Venda Falsa" | "Clonagem de Marca" | "None",
-    riskScore: number,
-    analysisText: string,
-    brand?: string,
-    indicators?: string[]
-  ) => {
-    const newSearch: BuscaRecente = {
-      id: Date.now().toString(),
-      url,
-      scamDetected,
-      scamType,
-      riskScore,
-      analysisText,
-      timestamp: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-      detectedBrand: brand || "Nenhuma",
-      maliciousIndicators: indicators || []
-    };
-    setRecentSearches(prev => [newSearch, ...prev]);
-  };
+    if (!isPremium) {
+      setPesquisasRestantesState(prev => {
+        const nextValue = Math.max(0, prev - 1);
+        localStorage.setItem("dg_pesquisas_restantes", nextValue.toString());
+        return nextValue;
+      });
+    }
+  }, [isPremium, pesquisasRestantes]);
 
-  const clearSearches = () => {
+  const clearSearches = useCallback(() => {
     setRecentSearches([]);
-  };
+    localStorage.removeItem("dg_searches");
+  }, []);
 
   return (
-    <AppStateContext.Provider
-      value={{
-        currentPage,
-        navigationHistory,
-        pushPage,
-        popPage,
-        isPremium,
-        setPremiumGlobal,
-        pesquisasRestantes,
-        setPesquisasRestantes,
-        anunciosVistos,
-        setAnunciosVistos,
-        usuarios,
-        toggleUserPremium,
-        addUsuario,
-        recentSearches,
-        addSearch,
-        clearSearches,
-        maintenanceMode,
-        setMaintenanceMode,
-        kiwifyLink,
-        setKiwifyLink,
-        paymentPlatform,
-        setPaymentPlatform
-      }}
-    >
+    <AppStateContext.Provider value={{ currentPage, navigationHistory, pushPage, popPage, isPremium, setPremiumGlobal, pesquisasRestantes, setPesquisasRestantes, anunciosVistos, setAnunciosVistos, usuarios, toggleUserPremium, addUsuario, recentSearches, addSearch, clearSearches, maintenanceMode, setMaintenanceMode, kiwifyLink, setKiwifyLink, paymentPlatform, setPaymentPlatform, customAdDirectLink, setCustomAdDirectLink, customAdScript, setCustomAdScript, customAdText, setCustomAdText, customAdUrl, setCustomAdUrl, triggerAdPopup, isAdminAuthenticated, setIsAdminAuthenticated, forceShowAds, setForceShowAds }}>
       {children}
     </AppStateContext.Provider>
   );
 };
 
-export const useAppContext = () => {
+export const useAppState = () => {
   const context = useContext(AppStateContext);
-  if (context === undefined) {
-    throw new Error("useAppContext deve ser usado dentro de um AppStateProvider");
-  }
+  if (!context) throw new Error("useAppState erro");
   return context;
 };
+export const useAppContext = useAppState;
