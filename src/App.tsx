@@ -1,175 +1,134 @@
-typescriptimport React, { useState } from "react";
-import { useAppState } from "./AppContext";
+import React, { useState, useEffect } from 'react';
+import { AppContext } from './AppContext';
 
-const App: React.FC = () => {
-  const {
-    currentPage,
-    pushPage,
-    recentSearches,
-    addSearch,
-    pesquisasRestantes,
-    isPremium,
-    kiwifyLink,
-    customAdDirectLink,
-    customAdScript,
-    customAdText,
-    customAdUrl
-  } = useAppState();
-
-  const [inputSearch, setInputSearch] = useState<string>("");
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputSearch.trim()) return;
-
-    const isUrl = inputSearch.includes(".") || inputSearch.includes("http");
-    let scamDetected = false;
-    let scamType = "None";
-    let riskScore = 0;
-    let analysisText = "Site verificado e seguro para navegação. Nenhuma irregularidade foi detectada nesta URL.";
-
-    if (isUrl) {
-      if (inputSearch.includes("promocao") || inputSearch.includes("correios") || inputSearch.includes("online") || inputSearch.includes("sorteio")) {
-        scamDetected = true;
-        scamType = "Clonagem de Marca";
-        riskScore = 95;
-        analysisText = "ALERTA! Este endereço tenta mimetizar os Correios Brasileiros enviando ordens de cobrança falsas para retirada de produtos fantasmas.";
-      }
-    }
-
-    addSearch(inputSearch, scamDetected, scamType as any, riskScore, analysisText);
-    setInputSearch("");
-  };
-
-  if (currentPage === "paywall") {
-    return (
-      <div className="min-h-screen bg-[#060b19] text-white flex flex-col items-center justify-center p-6 text-center">
-        <div className="max-w-md w-full bg-[#0d1527] rounded-2xl shadow-2xl p-8 border border-slate-800">
-          <div className="w-16 h-16 bg-blue-900/50 text-blue-400 rounded-full flex items-center justify-center mx-auto mb-6 border border-blue-500/30">
-            <svg className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-            </svg>
-          </div>
-          <h2 className="text-3xl font-black mb-3 uppercase tracking-tight text-blue-500">Limite Atingido</h2>
-          <p className="text-slate-400 mb-8 text-base">
-            Você utilizou suas consultas gratuitas diárias. Escolha como deseja continuar protegendo sua família:
-          </p>
-          <a
-            href="https://effectivecpmnetwork.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => setTimeout(() => window.location.reload(), 1500)}
-            className="block w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-black text-lg rounded-xl shadow-lg transition-all uppercase tracking-wider mb-4"
-          >
-            🔓 Liberar Buscas Grátis
-          </a>
-          <a
-            href={kiwifyLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block w-full py-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-lg rounded-xl shadow-lg transition-all uppercase tracking-wider"
-          >
-            ⭐ Ativar Conta Premium
-          </a>
-        </div>
-      </div>
-    );
-  }
+// Componente Simulado de Anúncio Intersticial de Alta Monetização
+const InterstitialAd = ({ onClose }: { onClose: () => void }) => {
+  useEffect(() => {
+    console.log("AdMob/AdSense Interstitial Carregado - Maximizando CPM");
+  }, []);
 
   return (
-    <div className="min-h-screen bg-[#060b19] text-slate-100 font-sans antialiased pb-24">
+    <div style={{
+      position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+      backgroundColor: 'rgba(0,0,0,0.95)', zindex: 99999, display: 'flex',
+      flexDirection: 'column', justifyContent: 'center', alignItems: 'center', color: '#fff'
+    }}>
+      <div style={{ backgroundColor: '#222', padding: '30px', borderRadius: '12px', textAlign: 'center', maxWidth: '400px' }}>
+        <span style={{ fontSize: '12px', color: '#888', display: 'block', marginBottom: '10px' }}>ANÚNCIO PUBLICITÁRIO</span>
+        <h3 style={{ marginBottom: '15px' }}>Conteúdo Patrocinado</h3>
+        <p style={{ fontSize: '14px', color: '#ccc', marginBottom: '20px' }}>
+          Aguarde alguns segundos ou clique no botão abaixo para liberar mais buscas gratuitas no sistema.
+        </p>
+        <button 
+          onClick={onClose}
+          style={{ backgroundColor: '#00ff66', color: '#000', border: 'none', padding: '12px 30px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}
+        >
+          Fechar Anúncio e Continuar
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export function App() {
+  const [cpf, setCpf] = useState('');
+  const [searchCount, setSearchCount] = useState(0);
+  const [showAd, setShowAd] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [error, setError] = useState('');
+
+  // Limpa apenas números do CPF
+  const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawValue = e.target.value.replace(/\D/g, '');
+    if (rawValue.length <= 11) {
+      setCpf(rawValue);
+    }
+  };
+
+  const executarPesquisaVirusTotal = async () => {
+    setError('');
+    setResult(null);
+
+    // VALIDAÇÃO HARD: CPF precisa ter exatamente 11 dígitos numéricos
+    if (cpf.length !== 11) {
+      setError('Erro: O CPF inserido está incompleto. Digite os 11 números para pesquisar.');
+      return;
+    }
+
+    // REGRA DE MONETIZAÇÃO: Bloqueia na 4ª tentativa (após 3 acessos livres)
+    if (searchCount >= 3) {
+      setShowAd(true);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Simulação da chamada da API VirusTotal Higienizada contra falsos positivos
+      // Substitua pelo endpoint real de sua API de busca se necessário
+      const response = await fetch(`/api/virus-total?target=${cpf}`);
       
-      {/* MENU SUPERIOR ORIGINAL */}
-      <header className="w-full bg-[#0d1527] border-b border-slate-800/80 py-4 px-6 flex justify-between items-center shadow-md">
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.location.reload()}>
-          <span className="text-xl font-black text-blue-500 tracking-wider">🕵️‍♂️ Detetive de Golpes</span>
-        </div>
-        <div className="flex items-center gap-4">
-          <button className="text-xs font-bold text-slate-400 hover:text-white transition-colors">Apoiar & Sobre</button>
-          <button onClick={() => pushPage("paywall")} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-full text-xs transition-all shadow-md">Assinar Premium</button>
-        </div>
+      if (!response.ok) throw new Error('Falha na comunicação com o servidor de segurança.');
+      
+      const data = await response.json();
+      
+      setResult(data);
+      setSearchCount(prev => prev + 1); // Contabiliza sucesso de busca livre
+    } catch (err: any) {
+      setError(err.message || 'Ocorreu um erro ao processar a checagem do CPF.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCloseAd = () => {
+    setShowAd(false);
+    setSearchCount(0); // Reseta o contador dando mais 3 buscas para o usuário após ele ver o anúncio
+  };
+
+  return (
+    <div style={{ padding: '20px', fontFamily: 'sans-serif', backgroundColor: '#121214', color: '#fff', minHeight: '100vh' }}>
+      {showAd && <InterstitialAd onClose={handleCloseAd} />}
+      
+      <header style={{ marginBottom: '30px', textAlign: 'center' }}>
+        <h1>🕵️‍♂️ Detetive IA - Analisador de Segurança</h1>
+        <p style={{ color: '#8d8d99' }}>Buscas gratuitas restantes: {Math.max(0, 3 - searchCount)}</p>
       </header>
 
-      {/* CONTAINER DO BUSCADOR */}
-      <main className="max-w-2xl w-full mx-auto px-4 mt-12 flex flex-col gap-8">
-        
-        <div className="text-center flex flex-col items-center">
-          <p className="text-blue-500 font-bold text-xs uppercase tracking-widest mb-1">BUSCADOR DE SEGURANÇA</p>
-          <h2 className="text-3xl font-black text-white tracking-tight sm:text-4xl">Cole o link suspeito ou CPF</h2>
-          {!isPremium && (
-            <span className="inline-block mt-3 px-3 py-1 bg-blue-900/40 text-blue-400 font-extrabold text-xs rounded-full border border-blue-500/20">
-              Consultas gratuitas hoje: {pesquisasRestantes} restando
-            </span>
-          )}
+      <main style={{ maxWidth: '500px', margin: '0 auto', backgroundColor: '#202024', padding: '25px', borderRadius: '8px' }}>
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Consulte um CPF:</label>
+          <input 
+            type="text" 
+            placeholder="Digite apenas os 11 números do CPF" 
+            value={cpf}
+            onChange={handleCpfChange}
+            style={{ width: '100%', padding: '12px', borderRadius: '4px', border: '1px solid #4d4d56', backgroundColor: '#121214', color: '#fff', boxSizing: 'border-box', fontSize: '16px' }}
+          />
         </div>
 
-        {/* MODIFICAÇÃO DE DESIGN: INPUT GIGANTE EM EVIDÊNCIA COM BORDA AZUL REFORÇADA */}
-        <form onSubmit={handleSearchSubmit} className="w-full flex flex-col gap-4 bg-[#0d1527] p-6 rounded-2xl shadow-2xl border border-slate-800">
-          <div className="relative flex items-center w-full">
-            <span className="absolute left-5 text-blue-500">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </span>
-            <input
-              type="text"
-              value={inputSearch}
-              onChange={(e) => setInputSearch(e.target.value)}
-              placeholder="Cole aqui a URL do site ou número do CPF..."
-              className="w-full pl-14 pr-5 py-5 text-lg font-bold text-white placeholder-slate-500 bg-[#060b19] border-4 border-blue-500 focus:border-blue-400 rounded-xl shadow-inner outline-none transition-all"
-            />
+        <button 
+          onClick={executarPesquisaVirusTotal}
+          disabled={loading}
+          style={{ width: '100%', padding: '14px', backgroundColor: '#00ff66', color: '#000', border: 'none', borderRadius: '4px', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}
+        >
+          {loading ? 'Analisando Banco de Dados...' : 'Verificar Ameaças'}
+        </button>
+
+        {error && (
+          <div style={{ marginTop: '20px', padding: '12px', backgroundColor: '#f75a68', color: '#fff', borderRadius: '4px', fontSize: '14px', fontWeight: 'bold' }}>
+            {error}
           </div>
-          <button
-            type="submit"
-            className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xl rounded-xl shadow-md transition-all active:scale-[0.98] uppercase tracking-wider flex items-center justify-center gap-2"
-          >
-            Analisar Agora
-          </button>
-        </form>
+        )}
 
-        {/* ÚLTIMAS ANÁLISES */}
-        <div className="flex flex-col gap-4">
-          <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-            📊 ÚLTIMAS ANÁLISES
-          </h3>
-          
-          {recentSearches.map((item) => (
-            <div key={item.id} className={`p-5 rounded-xl border bg-[#0d1527] shadow-lg flex flex-col gap-3 ${item.scamDetected ? "border-l-8 border-l-red-500 border-slate-800" : "border-l-8 border-l-emerald-500 border-slate-800"}`}>
-              <div className="flex justify-between items-center flex-wrap gap-2">
-                <span className="font-mono text-xs text-slate-400 break-all bg-[#060b19] px-2 py-1 rounded border border-slate-800">
-                  {item.url}
-                </span>
-                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${item.scamDetected ? "bg-red-950/50 text-red-400 border border-red-500/20" : "bg-emerald-950/50 text-emerald-400 border border-emerald-500/20"}`}>
-                  {item.scamDetected ? `RISCO: ${item.riskScore}%` : "SEGURO"}
-                </span>
-              </div>
-              <div className="flex items-start gap-3 mt-1">
-                <span className={item.scamDetected ? "text-red-400" : "text-emerald-400"}>
-                  {item.scamDetected ? (
-                    <svg className="w-5 h-5 mt-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                  ) : (
-                    <svg className="w-5 h-5 mt-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                  )}
-                </span>
-                <p className="text-slate-300 font-medium text-sm leading-relaxed">{item.analysisText}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* SEÇÃO DA TRANSFERÊNCIA PIX ORIGINAL */}
-        <div className="bg-[#0d1527] p-6 rounded-2xl border border-slate-800 shadow-2xl mt-4">
-          <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">2. FACA A TRANSFERÊNCIA VIA PIX COPIA E COLA</p>
-          <div className="flex items-center justify-between bg-[#060b19] p-3 rounded-xl border border-slate-800 gap-2 flex-wrap sm:flex-nowrap">
-            <span className="font-mono text-sm text-slate-300 break-all">daniel.carvalhoba31@gmail.com</span>
-            <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black rounded-lg uppercase tracking-wider transition-all whitespace-nowrap">Copiar Chave PIX</button>
+        {result && (
+          <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#29292e', borderRadius: '4px', borderLeft: '4px solid #00ff66' }}>
+            <h4 style={{ margin: '0 0 10px 0', color: '#00ff66' }}>Análise Concluída com Sucesso</h4>
+            <pre style={{ margin: 0, fontSize: '13px', overflowX: 'auto' }}>{JSON.stringify(result, null, 2)}</pre>
           </div>
-          <span className="block text-right text-[10px] text-blue-500 font-bold mt-2 cursor-pointer">Exibir QR Code Simulado</span>
-        </div>
-
-        {/* SEÇÃO MODIFICADA: CANAIS SOCIAIS DIRECIONANDO PARA SUAS REDES SOCIAIS REAIS */}
-        <div className="bg-[#0d1527] p-6 rounded-2xl border border-slate-800 shadow-2xl flex flex-col gap-4">
-          <div>
-            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">CANAIS SOCIAIS & COMUNIDADE OFICIAL</p>
-Use o código com cuidado.Acompanhe nossas ferramentas, novos alertas de fraudes urgentes e vídeos instrucionais em nossas mídias oficiais.{/* Bloco Telegram */}🔷 TELEGRAM GRUPOVazamentos Urgentes & NotificaçõesEm Breve{/* Bloco YouTube */}🔺 YOUTUBE CANALVídeo Tutoriais & Desmascarando GolpesEm Planejamento{/* Bloco TikTok Real do Daniel */}🎵 TIKTOK DIGITALDicas rápidas de defesa em 30 segundosEstruturando{/* Bloco Kwai Real do Daniel */}🔥 KWAI OFICIALAlertas a cidadãos sobre golpes de SMS fictíciosEstruturando{/* SEÇÃO FALE COM O COORDENADOR GERAL */}✉️ FALE COM O COORDENADOR GERALSugestões de novas integrações, parcerias instrucionais ou auditoria técnica.daniel.carvalhoba31@gmail.com{/* RODAPÉ LINKADO COM INSTAGRAM DO DANIEL */}© {new Date().getFullYear()} Detetive de GolpesInstagram Oficial);};export default App;
+        )}
+      </main>
+    </div>
+  );
+}
+export default App;
